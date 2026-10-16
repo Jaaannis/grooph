@@ -13,6 +13,7 @@ use grooph_measure::generator::{
     MAX_BARS, MAX_COMPLEXITY, effective_subdivision, offered_subdivisions,
 };
 use grooph_measure::swing::{MAX_SWING_PERCENT, MIN_SWING_PERCENT, SwingUnit};
+use grooph_measure::tap_tempo::{TapPulse, tap_pulse};
 use grooph_measure::tempo::{MAX_BPM, MIN_BPM};
 
 /// Height of a touch-friendly row or button.
@@ -193,12 +194,12 @@ impl Grooph {
     /// picker below lets the user hand-pick instead.
     fn complexity_choices(&mut self, ui: &mut Ui) -> bool {
         let settings = &mut self.editor.generator.settings;
-        let current = if settings.custom_groupings_enabled { 0 } else { settings.complexity };
+        let current = if settings.custom_figures_enabled { 0 } else { settings.complexity };
         let options: Vec<_> = (1..=MAX_COMPLEXITY).map(|l| (l, l.to_string())).collect();
         let picked = choice_grid(ui, &options, current, MAX_COMPLEXITY as usize);
         if let Some(level) = picked {
             settings.complexity = level;
-            settings.custom_groupings_enabled = false;
+            settings.custom_figures_enabled = false;
         }
         ui.add_space(8.0);
         ui.horizontal(|ui| {
@@ -213,7 +214,7 @@ impl Grooph {
             .id_salt("compact_groupings")
             .show(ui, |ui| {
                 egui::ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
-                    self.groupings_picker(ui);
+                    self.figures_picker(ui);
                 });
             });
         picked.is_some()
@@ -255,9 +256,13 @@ impl Grooph {
         ui.add(egui::Slider::new(&mut bpm, MIN_BPM..=MAX_BPM).show_value(false));
         ui.add_space(4.0);
 
+        let pulse = tap_pulse(self.current_measure().time_signature());
         let tap = wide_button(ui, "Tap", 22.0, 72.0);
+        if pulse != TapPulse::Quarter {
+            ui.vertical_centered(|ui| ui.weak(format!("Tap in {}", pulse.name())));
+        }
         if tap.clicked()
-            && let Some(tapped) = self.ui.tap_tempo.tap(ui.input(|i| i.time))
+            && let Some(tapped) = self.ui.tap_tempo.tap(ui.input(|i| i.time), pulse)
         {
             bpm = tapped;
         }

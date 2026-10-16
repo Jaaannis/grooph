@@ -16,6 +16,7 @@ mod mixer_panel;
 mod pickers;
 mod platform;
 mod play_along;
+mod playback_clock;
 mod preset_panel;
 mod presets;
 mod settings_panel;
@@ -227,6 +228,9 @@ impl CountingBase {
         };
         let mut layer = CountLayer::new(id, scope, Subdiv::Fixed(subdiv));
         layer.labels = Some(labels);
+        // Triplets of a group of eighths are the eighths themselves: count
+        // them as "1 la li" in x/8 and x/16.
+        layer.group_units = self == Self::Triplet;
         Some(layer)
     }
 
@@ -645,7 +649,7 @@ impl Grooph {
             Some(LinkContent::Generator { settings, seed }) => {
                 self.stop_transport();
                 self.editor.generator.settings = GeneratorSettings {
-                    custom_groupings: self.editor.generator.settings.custom_groupings,
+                    custom_figures: self.editor.generator.settings.custom_figures,
                     ..settings
                 };
                 self.generate_new_score_with_seed(seed);
@@ -1063,5 +1067,17 @@ mod tests {
             let c = load(hidden);
             assert!(c.base == CountingBase::Off && !c.show_tuplets, "{hidden}");
         }
+    }
+
+    #[test]
+    fn generator_settings_stored_before_the_figures_rename_still_load() {
+        use grooph_measure::generator::GeneratorSettings;
+        let mut settings =
+            GeneratorSettings { custom_figures_enabled: true, ..GeneratorSettings::default() };
+        settings.custom_figures.insert(grooph_measure::generator::FigureId(3));
+        let old = ron::to_string(&settings).unwrap().replace("custom_figures", "custom_groupings");
+        assert!(old.contains("custom_groupings_enabled"));
+        let back: GeneratorSettings = ron::from_str(&old).unwrap();
+        assert_eq!(back, settings);
     }
 }
