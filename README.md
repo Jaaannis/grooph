@@ -4,6 +4,8 @@ Short description: Grooph is a rhythm and meter editor with playback. The app
 shows a single measure, allows notes/rests/tuplets (triplets), plays a metronome
 track, and runs native as well as WebAssembly (eframe/egui).
 
+<img width="945" height="2048" alt="image" src="https://github.com/user-attachments/assets/208b524b-b48e-4410-8b41-dfb3f060c8e7" />
+
 This README is meant for LLM coding agents and describes the key concepts,
 files, and invariants so changes can be made with confidence.
 
