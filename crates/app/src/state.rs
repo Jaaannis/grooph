@@ -12,6 +12,7 @@ use eframe::egui::TextStyle;
 use eframe::epaint::FontId;
 use grooph_audio::{Audio, AudioSettings, GapClick, TempoRamp};
 use grooph_link::SharedLink;
+use grooph_measure::click::ClickPatterns;
 use grooph_measure::swing::Swing;
 use grooph_measure::tap_tempo::TapTempo;
 use grooph_measure::{Cursor, Measure, Score};
@@ -30,6 +31,8 @@ pub(crate) struct AudioConfig {
     pub(crate) gap: GapClick,
     /// Metronome trainer: stepwise tempo change from `bpm`.
     pub(crate) ramp: TempoRamp,
+    /// How loud the metronome clicks each beat group, per meter.
+    pub(crate) click: ClickPatterns,
 }
 
 impl Default for AudioConfig {
@@ -42,6 +45,7 @@ impl Default for AudioConfig {
             swing: Swing::default(),
             gap: GapClick::default(),
             ramp: TempoRamp::default(),
+            click: ClickPatterns::default(),
         }
     }
 }

@@ -14,6 +14,7 @@
 //! | `seed`    | Generator seed; the same parameters and seed give the same rhythm |
 //! | `swing`   | Swing in percent, 50 (straight) to 75 (dotted); 66 is a triplet feel |
 //! | `su`      | Swung note value: `8` (default) or `16`; needs `swing` |
+//! | `click`   | Click pattern of the meter of `r` (its first measure) or `ts`: one letter per beat group, `S` strong, `M` medium, `L` soft, `-` off |
 //!
 //! Any of `sub`, `lvl`, `bars`, `space` or `seed` selects the generator;
 //! unknown parameters are ignored. [`SharedLink::to_url`] is the inverse of
@@ -29,6 +30,7 @@
 //! old 7/8 link at `bpm=140` opens at 70 and plays as fast as it used to. A
 //! score mixing beat units is converted by its first measure.
 
+use grooph_measure::click::ClickPattern;
 use grooph_measure::generator::{
     GeneratorSettings, MAX_BARS, MAX_COMPLEXITY, Subdivision, supports_time_signature,
 };
@@ -47,6 +49,8 @@ pub struct SharedLink {
     pub bpm: Option<u32>,
     pub swing: Option<Swing>,
     pub content: Option<LinkContent>,
+    /// Click pattern of the content's meter (the first measure's meter).
+    pub click: Option<ClickPattern>,
 }
 
 #[derive(Clone, Debug)]
@@ -87,6 +91,7 @@ fn parse_query_with_default_version(
     let mut seed = None;
     let mut swing_percent = None;
     let mut swing_unit = None;
+    let mut click = None;
 
     for pair in query.trim_start_matches('?').split('&').filter(|p| !p.is_empty()) {
         let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
@@ -114,6 +119,9 @@ fn parse_query_with_default_version(
                     Some(parse_in_range("swing", &value, MIN_SWING_PERCENT, MAX_SWING_PERCENT)?)
             }
             "su" => swing_unit = Some(parse_swing_unit(&value)?),
+            "click" => {
+                click = Some(value.parse::<ClickPattern>().map_err(|e| format!("click: {e}"))?)
+            }
             _ => {}
         }
     }
@@ -156,6 +164,18 @@ fn parse_query_with_default_version(
         ts.map(LinkContent::Metronome)
     };
 
+    if let Some(pattern) = &click {
+        let Some(ts) = content.as_ref().and_then(LinkContent::first_time_signature) else {
+            return Err("click needs a rhythm (r) or a time signature (ts)".into());
+        };
+        if !pattern.fits(ts) {
+            return Err(format!(
+                "click needs one letter per beat group, {ts} has {}",
+                ts.groups().len()
+            ));
+        }
+    }
+
     if version == 1
         && let Some(tempo) = bpm
         && let Some(ts) = content.as_ref().and_then(LinkContent::first_time_signature)
@@ -166,7 +186,7 @@ fn parse_query_with_default_version(
     if bpm.is_none() && swing.is_none() && content.is_none() {
         Ok(None)
     } else {
-        Ok(Some(SharedLink { bpm, swing, content }))
+        Ok(Some(SharedLink { bpm, swing, content, click }))
     }
 }
 
@@ -220,6 +240,9 @@ impl SharedLink {
             if swing.unit == SwingUnit::Sixteenths {
                 params.push(("su", "16".into()));
             }
+        }
+        if let Some(click) = &self.click {
+            params.push(("click", click.to_string()));
         }
         // The version alone opens nothing.
         if params.len() == 1 {
@@ -418,6 +441,7 @@ mod tests {
                 },
                 seed: Some(7),
             }),
+            click: None,
         };
         let url = generator.to_url("https://grooph.app/").unwrap();
         assert_eq!(
@@ -451,6 +475,19 @@ mod tests {
             matches!(parse(&url[2..]).content, Some(LinkContent::Metronome(ts)) if ts == grouped)
         );
         assert_eq!(SharedLink::default().to_url("/").unwrap(), "/");
+    }
+
+    #[test]
+    fn click_link() {
+        let link = parse("v=2&bpm=70&ts=7/8&click=S-L");
+        assert_eq!(link.click, Some("S-L".parse().unwrap()));
+        assert_eq!(link.to_url("/").unwrap(), "/?v=2&bpm=70&ts=7/8&click=S-L");
+        // The pattern belongs to the first measure of a rhythm.
+        let link = parse("r=6/8+q.+q.+|+3/4+q+q+q&click=SL");
+        assert_eq!(link.click, Some("SL".parse().unwrap()));
+        assert!(parse_query("ts=7/8&click=SM").unwrap_err().contains("7/8 has 3"));
+        assert!(parse_query("ts=7/8&click=SXM").unwrap_err().contains("click"));
+        assert!(parse_query("bpm=90&click=SMMM").unwrap_err().contains("needs a rhythm"));
     }
 
     #[test]
@@ -528,6 +565,7 @@ mod tests {
             bpm: Some(96),
             swing: None,
             content: Some(LinkContent::Score(score.clone())),
+            click: None,
         };
         let url = link.to_url("https://grooph.app/").unwrap();
         assert_eq!(url, "https://grooph.app/?v=2&bpm=96&r=3/4+%3Eq+t8+t8+r:t8+e+e+%7C+e.+s+q+r:q");
