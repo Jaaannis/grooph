@@ -4,6 +4,9 @@ use grooph_layout::glyphs;
 use grooph_layout::pixel_layout::{LayoutOpts, NoteLayout};
 use grooph_measure::BeatKind;
 
+/// Gap between a soft note's head and its parentheses, in em.
+const SOFT_PAREN_GAP_EM: f32 = 0.04;
+
 pub(super) fn draw_beat(
     painter: &egui::Painter,
     note: &NoteLayout,
@@ -27,14 +30,34 @@ pub(super) fn draw_beat(
         painter.text(pos, Align2::LEFT_CENTER, flag.to_string(), opts.font_id.clone(), color);
     }
 
-    // Draw notehead
-    painter.text(
-        note.center,
-        Align2::CENTER_CENTER,
-        glyph.to_string(),
-        opts.font_id.clone(),
-        color,
-    );
+    // Draw notehead. With a stem it hangs off the stem's right edge: both
+    // are rounded to pixels on their own, and centering the head could leave
+    // a hairline between them on small staffs.
+    let (pos, align) = match &note.stem {
+        Some(stem) if note.kind == BeatKind::Note => (
+            egui::pos2(stem.p1.x + opts.stem_thickness() * 0.5, note.center.y),
+            Align2::RIGHT_CENTER,
+        ),
+        _ => (note.center, Align2::CENTER_CENTER),
+    };
+    painter.text(pos, align, glyph.to_string(), opts.font_id.clone(), color);
+
+    // Parentheses of a soft note
+    if note.soft && note.kind == BeatKind::Note {
+        let dx = opts.metrics.head_size.x * 0.5 + opts.em * SOFT_PAREN_GAP_EM;
+        for (glyph, x, align) in [
+            (glyphs::GLYPH_NOTEHEAD_PAREN_LEFT, note.center.x - dx, Align2::RIGHT_CENTER),
+            (glyphs::GLYPH_NOTEHEAD_PAREN_RIGHT, note.center.x + dx, Align2::LEFT_CENTER),
+        ] {
+            painter.text(
+                egui::pos2(x, note.center.y),
+                align,
+                glyph.to_string(),
+                opts.font_id.clone(),
+                color,
+            );
+        }
+    }
 
     // Draw dots
     if !note.dots.is_empty() {
