@@ -184,8 +184,8 @@ impl PersistedState {
         Self {
             version: PERSISTED_STATE_VERSION,
             score: stash
-                .map_or(rhythm.map_or(&app.editor.score, |r| &r.score), |s| &s.score)
-                .clone(),
+            .map_or(rhythm.map_or(&app.editor.score, |r| &r.score), |s| &s.score)
+            .clone(),
             cursor: stash.map_or(rhythm.map_or(app.editor.cursor, |r| r.cursor), |s| s.cursor),
             bpm: stash.map_or(app.playback_ctl.bpm, |s| s.bpm),
             audio_settings: app.playback_ctl.audio_cfg.settings,
@@ -198,7 +198,7 @@ impl PersistedState {
             library: app.editor.library.clone(),
             active_pattern_id: stash.map_or(
                 rhythm.map_or(app.editor.active_pattern_id, |r| r.active_pattern_id),
-                |s| s.active_pattern_id,
+                                            |s| s.active_pattern_id,
             ),
             dirty: stash.map_or(rhythm.map_or(app.editor.dirty, |r| r.dirty), |s| s.dirty),
             generator_settings: generator.settings,
@@ -299,10 +299,10 @@ fn add_font(ctx: &Context) {
     ctx.add_font(FontInsert::new(
         "Bravura",
         egui::FontData::from_static(include_bytes!("../assets/fonts/Bravura.otf")),
-        vec![InsertFontFamily {
-            family: FontFamily::Name("music".into()),
-            priority: egui::epaint::text::FontPriority::Highest,
-        }],
+                                 vec![InsertFontFamily {
+                                     family: FontFamily::Name("music".into()),
+                                 priority: egui::epaint::text::FontPriority::Highest,
+                                 }],
     ));
 }
 
@@ -313,6 +313,7 @@ impl App for Grooph {
         self.compact_ui(ui);
         self.sync_click_bar();
         self.update_metronome_trainer();
+        self.update_adapt_window();
         self.update_endless();
         self.run_summary_window(ui);
         self.calibration_window(ui);
@@ -382,7 +383,7 @@ impl Grooph {
         PlaybackOptions {
             count_in: self.playback_ctl.audio_cfg.count_in,
             ghost_notes: (generator.ghost_notes && !self.metronome_mode())
-                .then_some(generator.settings.subdivision),
+            .then_some(generator.settings.subdivision),
             swing: self.playback_ctl.audio_cfg.swing,
             gap: self.playback_ctl.audio_cfg.gap,
             ramp: self.playback_ctl.audio_cfg.ramp,
@@ -400,7 +401,7 @@ impl Grooph {
     /// including the tempo ramp of the bar being played.
     pub(crate) fn score_timing(&self) -> ScoreTiming {
         ScoreTiming::from_score(&self.editor.score, self.current_bpm())
-            .with_swing(self.playback_ctl.audio_cfg.swing)
+        .with_swing(self.playback_ctl.audio_cfg.swing)
     }
 
     /// Tempo being played: the ramp tempo while a ramp runs, else the BPM setting.
@@ -436,7 +437,7 @@ impl Grooph {
     /// On commit, clears redo and accuracy edit state. On no-op, the snapshot is discarded.
     pub(crate) fn with_undo_snapshot<F>(&mut self, op: F) -> bool
     where
-        F: FnOnce(&mut Self) -> bool,
+    F: FnOnce(&mut Self) -> bool,
     {
         let snap = self.current_snapshot();
         if op(self) {
@@ -502,7 +503,7 @@ impl Grooph {
             }
             Some(Modification::SetTuplet(group_span, ..)) => {
                 self.editor.cursor.beat_idx =
-                    (group_span.end_idx + 1).min(self.current_measure().beats().len() - 1);
+                (group_span.end_idx + 1).min(self.current_measure().beats().len() - 1);
             }
             _ => {}
         }
@@ -559,8 +560,8 @@ impl Grooph {
             _ => {
                 let id = self.editor.library.add(
                     Self::pattern_name_or_default(&name, &self.editor.library),
-                    score,
-                    bpm,
+                                                 score,
+                                                 bpm,
                 );
                 self.editor.active_pattern_id = Some(id);
             }
@@ -644,7 +645,7 @@ impl Grooph {
     pub(crate) fn open_link(&mut self, link: SharedLink) {
         // A metronome link leaves the rhythm alone: nothing to lose.
         let replaces_rhythm =
-            link.content.as_ref().is_some_and(|c| !matches!(c, LinkContent::Metronome(_)));
+        link.content.as_ref().is_some_and(|c| !matches!(c, LinkContent::Metronome(_)));
         if replaces_rhythm && self.editor.dirty {
             self.ui.pending_load = Some(PendingLoad::Link(link));
         } else {
@@ -718,11 +719,11 @@ impl Grooph {
 
     fn build_button_measure(template: BeatTemplate) -> Measure {
         let beat_count =
-            if let Duration::Tuplet(TupletSpec { m, .. }) = template.duration { m } else { 2 };
+        if let Duration::Tuplet(TupletSpec { m, .. }) = template.duration { m } else { 2 };
 
         let mut measure = Measure::new_init(
             TimeSignature::new(beat_count, template.duration.base_note().denominator()),
-            template.kind,
+                                            template.kind,
         );
 
         if let Duration::Tuplet(TupletSpec { n, .. }) = template.duration {
@@ -737,23 +738,23 @@ impl Grooph {
 
         if let Duration::Simple(..) = template.duration
             && template.accented
-        {
-            measure.toggle_accent(0);
-        }
+            {
+                measure.toggle_accent(0);
+            }
 
-        if let Duration::Simple(..) = template.duration
-            && template.soft
-        {
-            measure.toggle_soft(0);
-        }
+            if let Duration::Simple(..) = template.duration
+                && template.soft
+                {
+                    measure.toggle_soft(0);
+                }
 
-        if let Duration::Tuplet(..) = template.duration {
-            //
-        } else {
-            measure.delete_beat(1);
-        }
+                if let Duration::Tuplet(..) = template.duration {
+                    //
+                } else {
+                    measure.delete_beat(1);
+                }
 
-        measure
+                measure
     }
 
     fn toggle_mode(&mut self, mode: Mode) {
@@ -778,7 +779,7 @@ impl Grooph {
         }
         self.playback_ctl.transport_state = TransportState::Playing;
         let midi_connected =
-            self.playback_ctl.midi.input.as_ref().is_some_and(|input| input.is_connected());
+        self.playback_ctl.midi.input.as_ref().is_some_and(|input| input.is_connected());
         let accuracy_start = midi_connected.then(clock::now_seconds);
         self.playback_ctl.play_along.engaged = false;
         self.playback_ctl.accuracy.tracker.dismiss_summary();
@@ -807,20 +808,29 @@ impl Grooph {
             && let Some(bpm) = self.playback_ctl.playback.ramp_bpm
             && bpm != self.playback_ctl.bpm
             && self.playback_ctl.play_along.calibration.is_none()
-        {
-            self.playback_ctl.bpm = bpm;
-            self.editor.dirty = true;
-        }
-        if self.playback_ctl.play_along.calibration.is_some() {
-            self.playback_ctl.accuracy.tracker.discard_session();
-        } else {
-            self.playback_ctl.accuracy.tracker.on_playback_stop();
-        }
-        self.playback_ctl.play_along.engaged = false;
-        self.playback_ctl.playback.reset();
-        self.end_calibration_run();
+            {
+                self.playback_ctl.bpm = bpm;
+                self.editor.dirty = true;
+            }
+            // The accuracy-adapted tempo survives the stop, like the ramp's.
+            if self.playback_ctl.play_along.settings.adapt.enabled
+                && self.playback_ctl.play_along.calibration.is_none()
+                && let Some(bpm) = self.playback_ctl.playback.adapt_bpm
+                && bpm != self.playback_ctl.bpm
+                {
+                    self.playback_ctl.bpm = bpm;
+                    self.editor.dirty = true;
+                }
+                if self.playback_ctl.play_along.calibration.is_some() {
+                    self.playback_ctl.accuracy.tracker.discard_session();
+                } else {
+                    self.playback_ctl.accuracy.tracker.on_playback_stop();
+                }
+                self.playback_ctl.play_along.engaged = false;
+                self.playback_ctl.playback.reset();
+                self.end_calibration_run();
 
-        self.ui.platform.release_wake_lock();
+                self.ui.platform.release_wake_lock();
     }
 
     pub fn toggle_playback(&mut self) {
@@ -857,11 +867,11 @@ impl Grooph {
 
         let now_seconds = clock::now_seconds();
         let start_time =
-            now_seconds - timing.global_tick_to_seconds(self.playback_ctl.playback.smooth_tick);
+        now_seconds - timing.global_tick_to_seconds(self.playback_ctl.playback.smooth_tick);
         self.playback_ctl
-            .accuracy
-            .tracker
-            .realign_start_time(start_time, self.playback_ctl.playback.smooth_tick);
+        .accuracy
+        .tracker
+        .realign_start_time(start_time, self.playback_ctl.playback.smooth_tick);
     }
 
     fn default_measure() -> Measure {
@@ -900,10 +910,10 @@ impl Grooph {
         let ff = FontFamily::Name("music".into());
 
         let mut state = cc
-            .storage
-            .and_then(|storage| eframe::get_value::<PersistedState>(storage, APP_STATE_KEY))
-            .filter(|s| s.version == PERSISTED_STATE_VERSION)
-            .unwrap_or_default();
+        .storage
+        .and_then(|storage| eframe::get_value::<PersistedState>(storage, APP_STATE_KEY))
+        .filter(|s| s.version == PERSISTED_STATE_VERSION)
+        .unwrap_or_default();
 
         if state.score.is_empty() {
             state.score = Score::single(Self::default_measure());
@@ -948,8 +958,8 @@ impl Grooph {
                         Self::build_button_measure(BeatTemplate {
                             kind: BeatKind::Note,
                             duration: Duration::Simple(Quarter),
-                            accented: true,
-                            soft: false,
+                                                   accented: true,
+                                                   soft: false,
                         }),
                     );
                 }
@@ -959,8 +969,8 @@ impl Grooph {
                         Self::build_button_measure(BeatTemplate {
                             kind: BeatKind::Note,
                             duration: Duration::Simple(Quarter),
-                            accented: false,
-                            soft: true,
+                                                   accented: false,
+                                                   soft: true,
                         }),
                     );
                 }
@@ -988,11 +998,11 @@ impl Grooph {
 
         if let (Some(input), Some(port_id)) = (midi_input.as_mut(), midi_selected_port_id.as_ref())
             && let Some(idx) = input.find_port_index_by_id(port_id)
-        {
-            let _ = input.connect(idx);
-        }
+            {
+                let _ = input.connect(idx);
+            }
 
-        let platform = PlatformRuntime::new();
+            let platform = PlatformRuntime::new();
         platform.install_listeners(cc.egui_ctx.clone());
         update_check::start(cc.egui_ctx.clone());
 
@@ -1139,7 +1149,7 @@ mod tests {
     fn generator_settings_stored_before_the_figures_rename_still_load() {
         use grooph_measure::generator::GeneratorSettings;
         let mut settings =
-            GeneratorSettings { custom_figures_enabled: true, ..GeneratorSettings::default() };
+        GeneratorSettings { custom_figures_enabled: true, ..GeneratorSettings::default() };
         settings.custom_figures.insert(grooph_measure::generator::FigureId(3));
         let old = ron::to_string(&settings).unwrap().replace("custom_figures", "custom_groupings");
         assert!(old.contains("custom_groupings_enabled"));

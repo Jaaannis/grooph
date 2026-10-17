@@ -5,13 +5,12 @@ use grooph_measure::tempo::ScoreTiming;
 
 use super::progress::update_progress;
 use super::recorder::record_hit;
-use super::session::{AccuracyMark, RecordingSession, RunSummary};
+use super::session::{AccuracyMark, GOOD_WINDOW_MS, RecordingSession, RunSummary};
 
 /// Coordinates the accuracy-recording session. Holds a `RecordingSession`
 /// that is either `Idle` (no playback) or `Recording` (playback active with
 /// accumulated hit/miss data). Lifecycle methods drive the state transitions;
 /// `record_hit` and `update_progress` are no-ops while idle.
-#[derive(Default)]
 pub(crate) struct AccuracyTracker {
     session: RecordingSession,
     /// Evaluation of the last finished run with at least one hit.
@@ -19,11 +18,29 @@ pub(crate) struct AccuracyTracker {
     /// Marks of that run, kept on the staff after stopping until the next
     /// run starts or the score is edited.
     last_marks: HashMap<u64, AccuracyMark>,
+    /// "Good" grading window in ms, from the play-along allowed offset.
+    good_window_ms: f64,
+}
+
+impl Default for AccuracyTracker {
+    fn default() -> Self {
+        Self {
+            session: RecordingSession::default(),
+            last_summary: None,
+            last_marks: HashMap::new(),
+            good_window_ms: GOOD_WINDOW_MS,
+        }
+    }
 }
 
 impl AccuracyTracker {
     pub(crate) fn new() -> Self {
         Self::default()
+    }
+
+    /// The user's allowed offset: the "good" window used for grading.
+    pub(crate) fn set_good_window_ms(&mut self, good_ms: f64) {
+        self.good_window_ms = good_ms;
     }
 
     pub(crate) fn has_start_time(&self) -> bool {
@@ -75,16 +92,22 @@ impl AccuracyTracker {
     fn end_session(&mut self) {
         if let Some(data) = self.session.data()
             && let Some(summary) = data.summary()
-        {
-            self.last_summary = Some(summary);
-            self.last_marks = data.marks_by_onset.clone();
-        }
-        self.session.stop();
+            {
+                self.last_summary = Some(summary);
+                self.last_marks = data.marks_by_onset.clone();
+            }
+            self.session.stop();
     }
 
     /// Running evaluation of the current session.
     pub(crate) fn live_summary(&self) -> Option<RunSummary> {
         self.session.data()?.summary()
+    }
+
+    /// Start a fresh measuring window: counters and stats reset, the marks
+    /// and progress cursor stay. Used by the accuracy-driven tempo change.
+    pub(crate) fn reset_window(&mut self) {
+        self.session.reset_window();
     }
 
     pub(crate) fn last_summary(&self) -> Option<RunSummary> {
@@ -123,7 +146,8 @@ impl AccuracyTracker {
         timing: &ScoreTiming,
         score: &Score,
     ) -> Option<f64> {
-        record_hit(self.session.data_mut()?, timestamp, timing, score)
+        let good_ms = self.good_window_ms;
+        record_hit(self.session.data_mut()?, timestamp, timing, score, good_ms)
     }
 
     pub(crate) fn update_progress(
@@ -150,15 +174,15 @@ mod tests {
     fn score_of_quarters(ts_list: &[TimeSignature]) -> Score {
         Score {
             measures: ts_list
-                .iter()
-                .map(|ts| {
-                    let mut m = Measure::new(*ts);
-                    for i in 0..(ts.beats as usize) {
-                        m.set_beat(i, Beat::note(q())).unwrap();
-                    }
-                    m
-                })
-                .collect(),
+            .iter()
+            .map(|ts| {
+                let mut m = Measure::new(*ts);
+                for i in 0..(ts.beats as usize) {
+                    m.set_beat(i, Beat::note(q())).unwrap();
+                }
+                m
+            })
+            .collect(),
         }
     }
 
@@ -254,8 +278,8 @@ mod tests {
         tracker.update_progress(window_end_secs, &timing, &score);
 
         let mark = tracker
-            .mark_for_onset(m1_first_onset)
-            .expect("expected miss mark at first note of measure 1");
+        .mark_for_onset(m1_first_onset)
+        .expect("expected miss mark at first note of measure 1");
         assert!(matches!(mark, AccuracyMark::Miss));
     }
 

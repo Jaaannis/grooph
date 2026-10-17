@@ -20,8 +20,11 @@ impl Grooph {
         let bars = self.played_bars();
         let ramp_bpm = (playing && ramp.enabled).then(|| match bar {
             Some(b) => ramp.bpm_for_bar(bpm, b.bar, bars),
-            None => bpm,
+                                                      None => bpm,
         });
+        // The accuracy-driven tempo uses the same channel as the ramp, so a
+        // change re-anchors the session below.
+        let ramp_bpm = ramp_bpm.or(self.playback_ctl.playback.adapt_bpm);
         self.playback_ctl.playback.bar_muted = bar.is_some_and(|b| b.muted);
         if self.playback_ctl.playback.ramp_bpm != ramp_bpm {
             self.playback_ctl.playback.ramp_bpm = ramp_bpm;
@@ -34,7 +37,7 @@ impl Grooph {
     pub(crate) fn gap_click_settings(&mut self, ui: &mut egui::Ui) {
         let gap = &mut self.playback_ctl.audio_cfg.gap;
         ui.checkbox(&mut gap.enabled, "Mute bars")
-            .on_hover_text("Practise inner time: the metronome drops out for some bars");
+        .on_hover_text("Practise inner time: the metronome drops out for some bars");
         ui.add_enabled_ui(gap.enabled, |ui| {
             ui.horizontal(|ui| {
                 ui.radio_value(&mut gap.mode, GapMode::Pattern, "Pattern");
@@ -52,8 +55,8 @@ impl Grooph {
                 GapMode::Random => {
                     ui.add(
                         egui::Slider::new(&mut gap.random_percent, 5..=90)
-                            .text("chance per bar")
-                            .suffix("%"),
+                        .text("chance per bar")
+                        .suffix("%"),
                     );
                 }
             }
@@ -69,15 +72,15 @@ impl Grooph {
         let start = self.playback_ctl.bpm;
         let ramp = &mut self.playback_ctl.audio_cfg.ramp;
         ui.checkbox(&mut ramp.enabled, "Change the tempo while playing")
-            .on_hover_text("Starts at the BPM setting and steps towards the target tempo");
+        .on_hover_text("Starts at the BPM setting and steps towards the target tempo");
         ui.add_enabled_ui(ramp.enabled, |ui| {
             ui.horizontal(|ui| {
                 ui.label(format!("From {start} to"));
                 ui.add(
                     egui::DragValue::new(&mut ramp.target_bpm)
-                        .range(MIN_BPM..=MAX_BPM)
-                        .speed(0.1)
-                        .suffix(" BPM"),
+                    .range(MIN_BPM..=MAX_BPM)
+                    .speed(0.1)
+                    .suffix(" BPM"),
                 );
             });
             ui.horizontal(|ui| {
@@ -86,14 +89,14 @@ impl Grooph {
                 ui.label("BPM every");
                 ui.add(egui::DragValue::new(&mut ramp.every).range(1..=64).speed(0.05));
                 egui::ComboBox::from_id_salt("ramp_unit")
-                    .selected_text(match ramp.unit {
-                        RampUnit::Bars => "bars",
-                        RampUnit::Loops => "loops",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut ramp.unit, RampUnit::Bars, "bars");
-                        ui.selectable_value(&mut ramp.unit, RampUnit::Loops, "loops");
-                    });
+                .selected_text(match ramp.unit {
+                    RampUnit::Bars => "bars",
+                    RampUnit::Loops => "loops",
+                })
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut ramp.unit, RampUnit::Bars, "bars");
+                    ui.selectable_value(&mut ramp.unit, RampUnit::Loops, "loops");
+                });
             });
             ui.horizontal(|ui| {
                 ui.label("At the target:");
