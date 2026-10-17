@@ -84,8 +84,10 @@ Important root files:
   `su` and the generator's `sub`, `lvl`, `bars`, `space`, `seed` (seeded
   `Rng`, so a link reproduces the same exercise). `parse_query` reads them,
   `SharedLink::to_url` writes them. The app reads the link once at startup
-  (`Grooph::open_link_from_url`), then removes it from the address bar. A link
-  that replaces the score goes through `PendingLoad::Link` and the
+  (`Grooph::open_link_from_url`), then removes it from the address bar. A
+  `ts` link on its own opens the Metronome tab with that meter (and its
+  `click` bar) and leaves the rhythm alone. A link that replaces the score
+  goes through `PendingLoad::Link` and the
   unsaved-changes dialog. "Copy link" in the library panel builds a link via
   `grooph_link::share_url`.
 - The link format is documented for AI agents in
@@ -248,9 +250,9 @@ Important root files:
 - One layout for every window size, made for touch first
   (`crates/app/src/compact.rs`). On windows wider than 720 pt the controls stay
   a centered column; the staff and the tool palette use the full width.
-- Tabs: Practice (generator card with Meter/Notes/Level/Bars/BPM, options
-  sheet, big "new rhythm" + play buttons), Metronome (see below), Edit (tool
-  palette + edit bar),
+- Tabs: Metronome (see below), Practice (generator card with
+  Meter/Notes/Level/Bars/BPM, options sheet, big "new rhythm" + play
+  buttons), Edit (tool palette + edit bar),
   More (Library, Mixer, Settings, Help reuse their panels). The tab is derived
   from `Mode` (`compact_tab`), so modes set elsewhere land on the right tab;
   the Metronome tab is open while `metronome_mode()`, in `Mode::Playback`
@@ -264,7 +266,9 @@ Important root files:
 - While a tempo ramp runs, the card shows the tempo being played ("BPM now").
 - Share (right of play, and in the edit bar) builds a score link with tempo
   and swing; on the web it opens the system share sheet
-  (`platform::open_share_sheet`, Web Share API), else copies the link.
+  (`platform::open_share_sheet`, Web Share API), else copies the link. In the
+  Metronome tab, share (right of play) builds a `ts` link with tempo, swing
+  and the click bar instead.
 - Keyboard shortcuts are ignored while a text field has the focus.
 
 
