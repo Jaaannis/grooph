@@ -13,7 +13,6 @@ use super::session::{
 /// taking swing into account.
 /// The delta is converted to milliseconds using the onset measure's tempo.
 ///
-/// `good_window_ms` is the user's allowed offset: the "good" grading window.
 /// Returns the delta in ms when the hit was matched to a note; a second hit
 /// on an already hit note counts as extra and returns `None`.
 pub(super) fn record_hit(
@@ -21,7 +20,6 @@ pub(super) fn record_hit(
     timestamp: f64,
     timing: &ScoreTiming,
     score: &Score,
-    good_window_ms: f64,
 ) -> Option<f64> {
     let total_ticks = timing.total_loop_ticks();
     if total_ticks == 0 || timing.total_loop_seconds() <= 0.0 {
@@ -63,7 +61,7 @@ pub(super) fn record_hit(
     // grading windows for fast notes.
     let gap_ticks = neighbour_gap_ticks(&beats, beat_idx, total);
     let gap_ms = if tps > 0.0 { gap_ticks / tps * 1000.0 } else { f64::INFINITY };
-    let windows = HitWindows::for_gap_ms(gap_ms, good_window_ms);
+    let windows = HitWindows::for_gap_ms(gap_ms);
     let grade = windows.grade(delta_ms);
 
     data.stats.push(delta_ms);

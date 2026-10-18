@@ -1,217 +1,32 @@
-use crate::accuracy::AccuracyState;
-use crate::compact::CompactState;
-use crate::generator::GeneratorState;
-use crate::library::PatternLibrary;
-use crate::pickers::Picker;
-use crate::platform::PlatformRuntime;
-use crate::play_along::PlayAlongState;
-use crate::presets::{PresetId, PresetLibrary};
-use crate::undo::UndoHistory;
-use crate::{CountingSettings, Mode, TransportState};
-use eframe::egui::TextStyle;
-use eframe::epaint::FontId;
-use grooph_audio::{Audio, AudioSettings, GapClick, TempoRamp};
-use grooph_link::SharedLink;
-use grooph_measure::click::ClickPatterns;
-use grooph_measure::swing::Swing;
-use grooph_measure::tap_tempo::TapTempo;
-use grooph_measure::{Cursor, Measure, Score};
-use grooph_midi::MidiInput;
-use std::collections::HashMap;
+use crate::TransportState;
 
-pub(crate) struct AudioConfig {
-    pub(crate) settings: AudioSettings,
-    pub(crate) offset: f32,
-    pub(crate) latency_enabled: bool,
-    /// Play one bar of clicks before playback starts.
-    pub(crate) count_in: bool,
-    /// Swing feel of the playback (notation stays straight).
-    pub(crate) swing: Swing,
-    /// Metronome trainer: muted bars.
-    pub(crate) gap: GapClick,
-    /// Metronome trainer: stepwise tempo change from `bpm`.
-    pub(crate) ramp: TempoRamp,
-    /// How loud the metronome clicks each beat group, per meter.
-    pub(crate) click: ClickPatterns,
+use super::tracker::AccuracyTracker;
+
+/// UI-level wrapper around `AccuracyTracker` that adds an `enabled` toggle and
+/// reacts to the toggle in the context of the current transport state.
+pub(crate) struct AccuracyState {
+    pub(crate) tracker: AccuracyTracker,
+    pub(crate) enabled: bool,
 }
 
-impl AudioConfig {
-    /// The latency offset in seconds, 0 while switched off.
-    pub(crate) fn latency_s(&self) -> f64 {
-        if self.latency_enabled { self.offset as f64 } else { 0.0 }
+impl AccuracyState {
+    pub(crate) fn new(enabled: bool) -> Self {
+        Self { tracker: AccuracyTracker::new(), enabled }
     }
-}
 
-impl Default for AudioConfig {
-    fn default() -> Self {
-        Self {
-            settings: AudioSettings::default(),
-            offset: 0.0,
-            latency_enabled: true,
-            count_in: false,
-            swing: Swing::default(),
-            gap: GapClick::default(),
-            ramp: TempoRamp::default(),
-            click: ClickPatterns::default(),
+    pub(crate) fn set_enabled(&mut self, enabled: bool, transport: TransportState) {
+        if self.enabled == enabled {
+            return;
         }
-    }
-}
-
-pub(crate) struct LayoutSettings {
-    pub(crate) width_cap_factor: f32,
-    pub(crate) accent_below: bool,
-    pub(crate) proportional_spacing: bool,
-    pub(crate) stem_length_factor: f32,
-    pub(crate) debug_bbox: bool,
-}
-
-impl Default for LayoutSettings {
-    fn default() -> Self {
-        Self {
-            width_cap_factor: 0.1,
-            accent_below: false,
-            proportional_spacing: true,
-            stem_length_factor: 0.9,
-            debug_bbox: false,
+        self.enabled = enabled;
+        if enabled {
+            if transport == TransportState::Playing {
+                self.tracker.on_playback_stop();
+            } else {
+                self.tracker.clear_for_edit();
+            }
+            return;
         }
+        self.tracker.on_playback_stop();
     }
-}
-
-/// Whether the audio engine is playing the count-in bar, as seen by the UI.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) enum CountInState {
-    /// No count-in: the score is playing.
-    #[default]
-    Off,
-    /// Playback started with count-in enabled; waiting for the audio engine to
-    /// report the count-in (negative position). `since` is the UI time.
-    Waiting { since: f64 },
-    /// Audio reports the count-in bar.
-    Active,
-}
-
-/// Give up waiting for the audio engine to report a count-in after this long
-/// (no audio device, engine failed to start).
-pub(crate) const COUNT_IN_WAIT_TIMEOUT_S: f64 = 0.5;
-
-#[derive(Default)]
-pub(crate) struct PlaybackState {
-    /// Cursor position in **global ticks** across the entire score loop.
-    pub(crate) smooth_tick: f64,
-    pub(crate) last_update: Option<f64>,
-    pub(crate) flash_intensity: f32,
-    /// Last (measure_idx, primary_beat_in_measure) that fired the flash. Tracks
-    /// both axes so the flash fires once per primary beat in every measure, not
-    /// only when the beat number changes.
-    pub(crate) last_primary_beat: Option<(usize, u32)>,
-    pub(crate) count_in: CountInState,
-    /// Tempo the ramp reached in the bar being played; `None` without a ramp.
-    pub(crate) ramp_bpm: Option<u32>,
-    /// Tempo the accuracy-driven stepping reached; `None` without it.
-    pub(crate) adapt_bpm: Option<u32>,
-    /// The gap click silences the bar being played.
-    pub(crate) bar_muted: bool,
-}
-
-impl PlaybackState {
-    pub(crate) fn reset(&mut self) {
-        *self = Self::default();
-    }
-
-    /// The score hasn't started yet (count-in pending or playing).
-    pub(crate) fn counting_in(&self) -> bool {
-        self.count_in != CountInState::Off
-    }
-}
-
-#[derive(Default)]
-pub(crate) struct MidiState {
-    pub(crate) input: Option<MidiInput>,
-    pub(crate) available_ports: Vec<String>,
-    pub(crate) selected_port_id: Option<String>,
-}
-
-/// Score editing surface: the document, where the cursor sits, undo history,
-/// and pre-built button thumbnails. Mutated by tools and the time-signature
-/// dialog; read by the rendering pipeline.
-pub(crate) struct EditorState {
-    pub(crate) score: Score,
-    pub(crate) cursor: Cursor,
-    pub(crate) history: UndoHistory,
-    /// Prebuilt measures for note/rest/tuplet tool buttons to avoid per-frame
-    /// reconstruction.
-    pub(crate) button_measures: HashMap<&'static str, Measure>,
-    /// User-saved, named patterns (score + tempo). Persisted across sessions.
-    pub(crate) library: PatternLibrary,
-    /// Id of the saved pattern the working score was loaded from, if any. Drives
-    /// "save" (overwrite) vs "save as" (new entry) and the active-row highlight.
-    /// `None` means the working score is unsaved / not tied to any entry.
-    pub(crate) active_pattern_id: Option<u64>,
-    /// Whether the working score/tempo has been edited since the last save or
-    /// load. Used to warn before discarding changes when loading another pattern.
-    pub(crate) dirty: bool,
-    /// Rhythm generator settings and endless-mode state.
-    pub(crate) generator: GeneratorState,
-    /// User-saved generator presets. Persisted across sessions.
-    pub(crate) presets: PresetLibrary,
-    /// Preset last loaded or saved; "Save" overwrites it when it is a user
-    /// preset. Not persisted.
-    pub(crate) active_preset: Option<PresetId>,
-}
-
-/// Realtime playback subsystem: transport, tempo, audio engine, MIDI input,
-/// tap input, and the accuracy tracker that ties hits to score onsets.
-pub(crate) struct PlaybackController {
-    pub(crate) transport_state: TransportState,
-    pub(crate) bpm: u32,
-    pub(crate) audio: Option<Audio>,
-    pub(crate) audio_cfg: AudioConfig,
-    pub(crate) playback: PlaybackState,
-    pub(crate) accuracy: AccuracyState,
-    pub(crate) midi: MidiState,
-    pub(crate) play_along: PlayAlongState,
-}
-
-/// UI shell state: which panel is visible, font configuration, layout knobs,
-/// counting overlay settings, and the platform abstraction for visibility /
-/// wake-lock.
-pub(crate) struct UiShell {
-    pub(crate) mode: Mode,
-    pub(crate) music_font_id: FontId,
-    pub(crate) font_bump: f32,
-    pub(crate) baseline_dark: Option<Vec<(TextStyle, f32)>>,
-    pub(crate) baseline_light: Option<Vec<(TextStyle, f32)>>,
-    pub(crate) layout: LayoutSettings,
-    pub(crate) counting: CountingSettings,
-    /// Whether the playback panel flashes on every primary beat. Off by default.
-    pub(crate) flash_enabled: bool,
-    pub(crate) platform: PlatformRuntime,
-    /// Transient text buffer for the "save current pattern" name input. Not
-    /// persisted.
-    pub(crate) save_name_buffer: String,
-    /// Name input for "save preset as". Not persisted.
-    pub(crate) preset_name_buffer: String,
-    /// User preset whose row in the preset picker is being renamed. Not persisted.
-    pub(crate) renaming_preset: Option<u64>,
-    /// Load awaiting the "discard unsaved changes?" confirmation. `Some` shows
-    /// the confirm dialog. Not persisted.
-    pub(crate) pending_load: Option<PendingLoad>,
-    /// Why a shared link could not be opened; `Some` shows an error dialog.
-    pub(crate) link_error: Option<String>,
-    /// UI time of the last "copy link" click, for a short confirmation.
-    pub(crate) link_copied_at: Option<f64>,
-    /// The window is phone-sized: the staff packs its notes tighter. Set
-    /// every frame.
-    pub(crate) narrow_screen: bool,
-    pub(crate) compact: CompactState,
-    /// Setting whose picker dialog is open.
-    pub(crate) picker: Option<Picker>,
-    /// Taps of the tap-tempo buttons (tempo picker).
-    pub(crate) tap_tempo: TapTempo,
-}
-
-/// Something that replaces the working score once unsaved changes are dealt with.
-pub(crate) enum PendingLoad {
-    Pattern(u64),
-    Link(SharedLink),
 }

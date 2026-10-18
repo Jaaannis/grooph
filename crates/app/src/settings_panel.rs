@@ -17,67 +17,67 @@ impl Grooph {
                     egui::CollapsingHeader::new("Sounds").default_open(false).show(ui, |ui| {
                         let settings = &mut self.playback_ctl.audio_cfg.settings;
                         egui::ComboBox::from_label("Metronome")
-                        .selected_text(settings.metronome_sound.label())
-                        .show_ui(ui, |ui| {
-                            for sound in MetronomeSound::ALL {
-                                ui.selectable_value(
-                                    &mut settings.metronome_sound,
-                                    sound,
-                                    sound.label(),
-                                );
-                            }
-                        });
+                            .selected_text(settings.metronome_sound.label())
+                            .show_ui(ui, |ui| {
+                                for sound in MetronomeSound::ALL {
+                                    ui.selectable_value(
+                                        &mut settings.metronome_sound,
+                                        sound,
+                                        sound.label(),
+                                    );
+                                }
+                            });
                         egui::ComboBox::from_label("Rhythm")
-                        .selected_text(settings.rhythm_sound.label())
-                        .show_ui(ui, |ui| {
-                            for sound in RhythmSound::ALL {
-                                ui.selectable_value(
-                                    &mut settings.rhythm_sound,
-                                    sound,
-                                    sound.label(),
-                                );
-                            }
-                        });
+                            .selected_text(settings.rhythm_sound.label())
+                            .show_ui(ui, |ui| {
+                                for sound in RhythmSound::ALL {
+                                    ui.selectable_value(
+                                        &mut settings.rhythm_sound,
+                                        sound,
+                                        sound.label(),
+                                    );
+                                }
+                            });
                     });
 
                     egui::CollapsingHeader::new("Click").default_open(false).show(ui, |ui| {
                         ui.label("Decay:");
                         ui.add(
                             egui::DragValue::new(&mut self.playback_ctl.audio_cfg.settings.decay)
-                            .range(0.01..=0.5)
-                            .speed(0.001)
-                            .suffix("s"),
+                                .range(0.01..=0.5)
+                                .speed(0.001)
+                                .suffix("s"),
                         );
                         ui.separator();
                         egui::ComboBox::from_label("Waveform")
-                        .selected_text(match self.playback_ctl.audio_cfg.settings.waveform {
-                            Waveform::Sine => "Sine",
-                            Waveform::Triangle => "Triangle",
-                            Waveform::Square => "Square",
-                            Waveform::Sawtooth => "Sawtooth",
-                        })
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut self.playback_ctl.audio_cfg.settings.waveform,
-                                Waveform::Sine,
-                                "Sine",
-                            );
-                            ui.selectable_value(
-                                &mut self.playback_ctl.audio_cfg.settings.waveform,
-                                Waveform::Triangle,
-                                "Triangle",
-                            );
-                            ui.selectable_value(
-                                &mut self.playback_ctl.audio_cfg.settings.waveform,
-                                Waveform::Square,
-                                "Square",
-                            );
-                            ui.selectable_value(
-                                &mut self.playback_ctl.audio_cfg.settings.waveform,
-                                Waveform::Sawtooth,
-                                "Sawtooth",
-                            );
-                        });
+                            .selected_text(match self.playback_ctl.audio_cfg.settings.waveform {
+                                Waveform::Sine => "Sine",
+                                Waveform::Triangle => "Triangle",
+                                Waveform::Square => "Square",
+                                Waveform::Sawtooth => "Sawtooth",
+                            })
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut self.playback_ctl.audio_cfg.settings.waveform,
+                                    Waveform::Sine,
+                                    "Sine",
+                                );
+                                ui.selectable_value(
+                                    &mut self.playback_ctl.audio_cfg.settings.waveform,
+                                    Waveform::Triangle,
+                                    "Triangle",
+                                );
+                                ui.selectable_value(
+                                    &mut self.playback_ctl.audio_cfg.settings.waveform,
+                                    Waveform::Square,
+                                    "Square",
+                                );
+                                ui.selectable_value(
+                                    &mut self.playback_ctl.audio_cfg.settings.waveform,
+                                    Waveform::Sawtooth,
+                                    "Sawtooth",
+                                );
+                            });
                         ui.separator();
                         ui.label("Noise Mix:");
                         ui.add(
@@ -132,9 +132,9 @@ impl Grooph {
                                 ui.label("Offset:");
                                 ui.add(
                                     egui::DragValue::new(&mut self.playback_ctl.audio_cfg.offset)
-                                    .range(-0.5..=0.5)
-                                    .speed(0.001)
-                                    .suffix("s"),
+                                        .range(-0.5..=0.5)
+                                        .speed(0.001)
+                                        .suffix("s"),
                                 );
                             });
                             ui.label("Adjust if audio is out of sync with cursor.");
@@ -159,15 +159,15 @@ impl Grooph {
                             ui.label("Size:");
                             ui.add(
                                 egui::DragValue::new(&mut self.ui.layout.width_cap_factor)
-                                .speed(0.01)
-                                .range(0.05..=0.5),
+                                    .speed(0.01)
+                                    .range(0.05..=0.5),
                             );
                             ui.separator();
                             ui.label("Stem Length Factor:");
                             ui.add(
                                 egui::DragValue::new(&mut self.ui.layout.stem_length_factor)
-                                .speed(0.01)
-                                .range(0.7..=1.3),
+                                    .speed(0.01)
+                                    .range(0.7..=1.3),
                             );
                             ui.separator();
                             ui.checkbox(&mut self.ui.layout.debug_bbox, "Show bounding boxes");
@@ -187,28 +187,28 @@ impl Grooph {
 
                     egui::CollapsingHeader::new("Counting").default_open(false).show(ui, |ui| {
                         egui::ComboBox::from_label("Count")
-                        .selected_text(match self.ui.counting.base {
-                            CountingBase::Off => "Off",
-                            CountingBase::Primary => "Primary",
-                            CountingBase::Ands => "Ands",
-                            CountingBase::Sixteenth => "16th",
-                            CountingBase::Triplet => "Triplet",
-                        })
-                        .show_ui(ui, |ui| {
-                            for (base, label) in [
-                                (CountingBase::Off, "Off"),
-                                 (CountingBase::Primary, "Primary"),
-                                 (CountingBase::Ands, "1 & 2 & ..."),
-                                 (CountingBase::Sixteenth, "1 e & a ..."),
-                                 (CountingBase::Triplet, "1 trip let ..."),
-                            ] {
-                                ui.add_enabled_ui(base.fits(&self.editor.score), |ui| {
-                                    ui.selectable_value(&mut self.ui.counting.base, base, label)
-                                })
-                                .inner
-                                .on_disabled_hover_text("Too fine for this time signature");
-                            }
-                        });
+                            .selected_text(match self.ui.counting.base {
+                                CountingBase::Off => "Off",
+                                CountingBase::Primary => "Primary",
+                                CountingBase::Ands => "Ands",
+                                CountingBase::Sixteenth => "16th",
+                                CountingBase::Triplet => "Triplet",
+                            })
+                            .show_ui(ui, |ui| {
+                                for (base, label) in [
+                                    (CountingBase::Off, "Off"),
+                                    (CountingBase::Primary, "Primary"),
+                                    (CountingBase::Ands, "1 & 2 & ..."),
+                                    (CountingBase::Sixteenth, "1 e & a ..."),
+                                    (CountingBase::Triplet, "1 trip let ..."),
+                                ] {
+                                    ui.add_enabled_ui(base.fits(&self.editor.score), |ui| {
+                                        ui.selectable_value(&mut self.ui.counting.base, base, label)
+                                    })
+                                    .inner
+                                    .on_disabled_hover_text("Too fine for this time signature");
+                                }
+                            });
                         ui.checkbox(&mut self.ui.counting.show_tuplets, "Tuplet overlay");
                     });
 
@@ -237,10 +237,10 @@ impl Grooph {
 
     fn play_along_settings(&mut self, ui: &mut egui::Ui) {
         let midi_connected =
-        self.playback_ctl.midi.input.as_ref().is_some_and(|input| input.is_connected());
+            self.playback_ctl.midi.input.as_ref().is_some_and(|input| input.is_connected());
         let settings = &mut self.playback_ctl.play_along.settings;
         ui.checkbox(&mut settings.tap_enabled, "Tap input")
-        .on_hover_text("Practise without MIDI: press the tap key or touch the staff");
+            .on_hover_text("Practise without MIDI: press the tap key or touch the staff");
         ui.add_enabled_ui(settings.tap_enabled, |ui| {
             egui::ComboBox::from_label("Tap key").selected_text(settings.tap_key.label()).show_ui(
                 ui,
@@ -259,9 +259,9 @@ impl Grooph {
             ui.label("Tap:");
             ui.add(
                 egui::DragValue::new(&mut settings.tap_offset_ms)
-                .range(range.clone())
-                .speed(0.5)
-                .suffix(" ms"),
+                    .range(range.clone())
+                    .speed(0.5)
+                    .suffix(" ms"),
             );
             if ui.add_enabled(settings.tap_enabled, egui::Button::new("Calibrate…")).clicked() {
                 calibrate = Some(HitSource::Tap);
@@ -271,17 +271,17 @@ impl Grooph {
             ui.label("MIDI:");
             ui.add(
                 egui::DragValue::new(&mut settings.midi_offset_ms)
-                .range(range)
-                .speed(0.5)
-                .suffix(" ms"),
+                    .range(range)
+                    .speed(0.5)
+                    .suffix(" ms"),
             );
             if ui
                 .add_enabled(midi_connected, egui::Button::new("Calibrate…"))
                 .on_disabled_hover_text("Choose a MIDI input first")
                 .clicked()
-                {
-                    calibrate = Some(HitSource::Midi);
-                }
+            {
+                calibrate = Some(HitSource::Midi);
+            }
         });
         ui.label(
             "Calibrate by playing along with a click; the median deviation becomes the offset.",
@@ -289,7 +289,5 @@ impl Grooph {
         if let Some(source) = calibrate {
             self.start_calibration(source);
         }
-        ui.separator();
-        self.adapt_settings(ui);
     }
 }

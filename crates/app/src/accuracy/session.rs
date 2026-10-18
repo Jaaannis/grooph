@@ -65,9 +65,6 @@ pub(crate) const GOOD_WINDOW_MS: f64 = 60.0;
 /// neighbouring onset, so "good" stays well inside the note's own hit window.
 const PERFECT_GAP_SHARE: f64 = 0.2;
 const GOOD_GAP_SHARE: f64 = 0.4;
-/// Share of the allowed "good" window that still counts as "perfect". Keeps
-/// the grading identical to the fixed windows this setting replaced.
-const PERFECT_SHARE: f64 = PERFECT_WINDOW_MS / GOOD_WINDOW_MS;
 
 /// Perfect/good windows of one note.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -77,12 +74,11 @@ pub(super) struct HitWindows {
 }
 
 impl HitWindows {
-    /// Windows for a note whose closest neighbouring onset is `gap_ms` away,
-    /// with the "good" window taken from the user's allowed offset.
-    pub(super) fn for_gap_ms(gap_ms: f64, good_ms: f64) -> Self {
+    /// Windows for a note whose closest neighbouring onset is `gap_ms` away.
+    pub(super) fn for_gap_ms(gap_ms: f64) -> Self {
         Self {
-            perfect_ms: (good_ms * PERFECT_SHARE).min(gap_ms * PERFECT_GAP_SHARE),
-            good_ms: good_ms.min(gap_ms * GOOD_GAP_SHARE),
+            perfect_ms: PERFECT_WINDOW_MS.min(gap_ms * PERFECT_GAP_SHARE),
+            good_ms: GOOD_WINDOW_MS.min(gap_ms * GOOD_GAP_SHARE),
         }
     }
 
@@ -179,8 +175,8 @@ pub(crate) fn compute_global_beat_onsets(
                 out.push(GlobalBeatOnset {
                     onset_tick: start + local as u64,
                     performed_tick: timing.performed_global_tick(m_idx, local),
-                         is_note: beat.kind == BeatKind::Note,
-                         measure_idx: m_idx,
+                    is_note: beat.kind == BeatKind::Note,
+                    measure_idx: m_idx,
                 });
             }
         }
@@ -301,16 +297,6 @@ impl RecordingSession {
         }
     }
 
-    /// Start a new measuring window: counters and stats go back to zero, the
-    /// marks and the progress cursor stay, so the staff keeps its feedback.
-    /// No-op when `Idle`.
-    pub(super) fn reset_window(&mut self) {
-        if let Self::Recording(d) = self {
-            d.stats.reset();
-            d.counters = RunCounters::default();
-        }
-    }
-
     /// Shift the recording's clock anchor. No-op when `Idle`.
     pub(super) fn realign(&mut self, start_time: f64, last_tick: f64) {
         if let Self::Recording(d) = self {
@@ -339,12 +325,12 @@ mod tests {
 
     #[test]
     fn windows_sort_hits_into_grades() {
-        let w = HitWindows::for_gap_ms(500.0, GOOD_WINDOW_MS);
+        let w = HitWindows::for_gap_ms(500.0);
         let grades: Vec<HitGrade> =
-        [0.0, -PERFECT_WINDOW_MS, PERFECT_WINDOW_MS + 1.0, -GOOD_WINDOW_MS, 100.0]
-        .into_iter()
-        .map(|d| w.grade(d))
-        .collect();
+            [0.0, -PERFECT_WINDOW_MS, PERFECT_WINDOW_MS + 1.0, -GOOD_WINDOW_MS, 100.0]
+                .into_iter()
+                .map(|d| w.grade(d))
+                .collect();
         use HitGrade::*;
         assert_eq!(grades, vec![Perfect, Perfect, Good, Good, Off]);
 
@@ -359,26 +345,16 @@ mod tests {
     fn windows_narrow_for_fast_notes() {
         // Slow notes keep the fixed windows.
         assert_eq!(
-            HitWindows::for_gap_ms(250.0, GOOD_WINDOW_MS),
-                   HitWindows { perfect_ms: PERFECT_WINDOW_MS, good_ms: GOOD_WINDOW_MS }
+            HitWindows::for_gap_ms(250.0),
+            HitWindows { perfect_ms: PERFECT_WINDOW_MS, good_ms: GOOD_WINDOW_MS }
         );
         // 16ths at 160 BPM are ~94 ms apart: good must stay well inside the
         // ~47 ms half-gap that separates this note from its neighbour.
-        let w = HitWindows::for_gap_ms(93.75, GOOD_WINDOW_MS);
+        let w = HitWindows::for_gap_ms(93.75);
         assert!((w.perfect_ms - 18.75).abs() < 1e-9);
         assert!((w.good_ms - 37.5).abs() < 1e-9);
         assert_eq!(w.grade(30.0), HitGrade::Good);
         assert_eq!(w.grade(40.0), HitGrade::Off);
-    }
-
-    #[test]
-    fn tolerance_scales_the_windows() {
-        let w = HitWindows::for_gap_ms(500.0, 100.0);
-        assert!((w.perfect_ms - 100.0 * PERFECT_SHARE).abs() < 1e-9);
-        assert_eq!(w.good_ms, 100.0);
-        // Fast notes still keep the gap cap.
-        let fast = HitWindows::for_gap_ms(93.75, 100.0);
-        assert_eq!(fast.good_ms, 37.5);
     }
 
     #[test]
